@@ -95,10 +95,18 @@ class alunos_api extends external_api {
         $created = [];
         $skipped = [];
         foreach ($data as $row) {
+            $row['firstname'] = trim((string)($row['firstname'] ?? ''));
+            $row['lastname'] = trim((string)($row['lastname'] ?? ''));
+            $row['email'] = trim((string)($row['email'] ?? ''));
             if (!empty($row['email']) && empty($row['username'])) {
                 $row['username'] = $row['email'];
             }
-            if (empty($row['email']) || empty($row['username'])) {
+            $row['username'] = trim((string)($row['username'] ?? ''));
+            if ($row['firstname'] === '' || $row['lastname'] === '') {
+                $skipped[] = ['row' => json_encode($row), 'reason' => 'Faltando nome/sobrenome'];
+                continue;
+            }
+            if ($row['email'] === '' || $row['username'] === '') {
                 $skipped[] = ['row' => json_encode($row), 'reason' => 'Faltando email/username'];
                 continue;
             }
