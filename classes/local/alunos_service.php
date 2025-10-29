@@ -114,30 +114,59 @@ class alunos_service {
      * @return int ID do usuário criado.
      */
     public static function create_user(array $u, ?string $companyvalue = null): int {
-        global $CFG, $DB;
-        require_once($CFG->libdir . '/moodlelib.php');
-        require_once($CFG->dirroot . '/user/lib.php');
-        require_once($CFG->dirroot . '/user/editlib.php');
+        global $CFG;
+        require_once($CFG->dirroot . '/user/externallib.php');
 
-        $user = new \stdClass();
-        $user->auth = 'manual';
-        $user->username = $u['username'];
-        $user->firstname = $u['firstname'];
-        $user->lastname  = $u['lastname'];
-        $user->email     = $u['email'];
-        $user->password  = generate_password(12);
-        $user->suspended = 0;
-        $user->confirmed = 1;
+        $firstname = trim((string)($u['firstname'] ?? ''));
+        $lastname = trim((string)($u['lastname'] ?? ''));
+        $email = trim((string)($u['email'] ?? ''));
+        $username = trim((string)($u['username'] ?? $email));
 
-        $userid = user_create_user($user, false, false);
-
-        if ($companyvalue !== null && $companyvalue !== '') {
-            self::set_company_value_for_user($userid, $companyvalue);
+        if ($firstname === '' || $lastname === '' || $email === '' || $username === '') {
+            throw new \invalid_parameter_exception('Dados obrigatórios do usuário ausentes.');
         }
 
-        $created = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
-        setnew_password_and_mail($created);
-        \useredit_force_password_change($userid);
+        $userpayload = [
+            'auth' => 'manual',
+            'username' => $username,
+            'firstname' => $firstname,
+            'lastname' => $lastname,
+            'email' => $email,
+            'suspended' => 0,
+            'createpassword' => 1,
+        ];
+
+        if (!empty($u['idnumber'])) {
+            $userpayload['idnumber'] = trim((string) $u['idnumber']);
+        }
+        if (!empty($u['city'])) {
+            $userpayload['city'] = trim((string) $u['city']);
+        }
+        if (!empty($u['country'])) {
+            $userpayload['country'] = trim((string) $u['country']);
+        }
+
+        $companyfield = null;
+        if ($companyvalue !== null && $companyvalue !== '') {
+            $companyfield = self::resolve_company_field();
+            if ($companyfield) {
+                $userpayload['customfields'] = [[
+                    'type' => $companyfield->shortname,
+                    'value' => $companyvalue,
+                ]];
+            }
+        }
+
+        $response = \core_user_external::create_users([$userpayload]);
+        if (empty($response) || empty($response[0]['id'])) {
+            throw new \moodle_exception('errorcreatinguser', 'local_portalgestao');
+        }
+
+        $userid = (int) $response[0]['id'];
+
+        if ($companyfield === null && $companyvalue !== null && $companyvalue !== '') {
+            self::set_company_value_for_user($userid, $companyvalue);
+        }
 
         return $userid;
     }
