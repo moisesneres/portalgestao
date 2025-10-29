@@ -142,7 +142,9 @@ class alunos_service {
             \useredit_force_password_change($userid);
         } else {
             set_user_preference('auth_forcepasswordchange', 1, $userid);
-            \core_user::reset_login_hash($userid);
+            if (method_exists('core_user', 'reset_login_hash')) {
+                \core_user::reset_login_hash($userid);
+            }
         }
 
         return $userid;
