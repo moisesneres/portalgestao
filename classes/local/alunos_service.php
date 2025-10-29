@@ -137,7 +137,15 @@ class alunos_service {
 
         $created = $DB->get_record('user', ['id' => $userid], '*', MUST_EXIST);
         setnew_password_and_mail($created);
-        \useredit_force_password_change($userid);
+
+        if (function_exists('useredit_force_password_change')) {
+            \useredit_force_password_change($userid);
+        } else {
+            set_user_preference('auth_forcepasswordchange', 1, $userid);
+            if (method_exists('core_user', 'reset_login_hash')) {
+                \core_user::reset_login_hash($userid);
+            }
+        }
 
         return $userid;
     }
